@@ -59,9 +59,20 @@ export async function proxy(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession();
 
+  const adminEmail = process.env.ADMIN_EMAIL;
+
   // Protect dashboard routes
-  if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Strict Email Check
+    if (adminEmail && session.user.email !== adminEmail) {
+      // Not the admin - sign out and redirect
+      await supabase.auth.signOut();
+      return NextResponse.redirect(new URL("/login?error=Unauthorized", request.url));
+    }
   }
 
   // Redirect logged in users away from login

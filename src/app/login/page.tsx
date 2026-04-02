@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ShieldCheck
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -17,16 +18,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    // Simulate Magic Link send
-    setTimeout(() => {
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      }
+    });
+
+    if (signInError) {
+      setError(signInError.message);
+      setIsLoading(false);
+    } else {
       setIsLoading(false);
       setIsSent(true);
-    }, 1500);
+    }
   };
 
   return (
@@ -52,6 +66,11 @@ export default function LoginPage() {
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold tracking-tight">Welcome Back</h2>
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">Sign in to your marketing headquarters.</p>
+                {error && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 animate-in fade-in slide-in-from-top-1 text-center">
+                    {error}
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleLogin} className="space-y-4">

@@ -14,6 +14,8 @@ import {
   Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 interface SidebarItemProps {
   href: string;
@@ -41,6 +43,15 @@ function SidebarItem({ href, icon, label }: SidebarItemProps) {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login?message=SignedOut");
+    router.refresh();
+  };
+
   return (
     <div className="flex h-screen bg-[hsl(var(--background))] overflow-hidden">
       {/* Sidebar */}
@@ -64,7 +75,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="mt-auto p-6 border-t border-[hsl(var(--border))] space-y-4">
           <SidebarItem href="/dashboard/settings" icon={<Settings />} label="Settings" />
-          <Button variant="ghost" className="w-full justify-start gap-3 p-3 h-auto text-[hsl(var(--muted-foreground))]">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-3 p-3 h-auto text-[hsl(var(--muted-foreground))]"
+            onClick={handleSignOut}
+          >
             <LogOut className="w-5 h-5" />
             <span>Sign Out</span>
           </Button>
