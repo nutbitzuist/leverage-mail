@@ -52,7 +52,7 @@ export default function FormsPage() {
       const result = await res.json();
       if (result.error) throw new Error(result.error);
       
-      const fullUrl = `${window.location.origin}/p/${slug}`;
+      const fullUrl = `${window.location.origin}/${slug}`;
       setPublishedUrl(fullUrl);
     } catch (err) {
       console.error(err);

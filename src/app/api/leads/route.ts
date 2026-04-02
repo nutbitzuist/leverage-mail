@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { Resend } from "resend";
+import { AutomationEngine } from "@/lib/engine";
 
 export async function GET() {
   const supabase = createClient();
@@ -98,37 +98,16 @@ export async function POST(req: Request) {
     }
 
     // 3. Trigger Automations (The "Brain")
-    const { data: activeAutomations } = await adminSupabase
-      .from("automations")
-      .select("*")
-      .eq("user_id", finalUserId)
-      .eq("is_active", true);
-
-    if (activeAutomations && activeAutomations.length > 0) {
-      console.log(`[Automation] Triggering ${activeAutomations.length} workflows for ${email}`);
-      
-      const resendApiKey = process.env.RESEND_API_KEY;
-      const resend = resendApiKey ? new Resend(resendApiKey) : null;
-      const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
-
-      for (const auto of activeAutomations) {
-        // Find immediate next step after trigger
-        const emailStep = auto.workflow_steps?.find((s: { type: string, title?: string, description?: string }) => s.type === 'email');
-        
-        if (emailStep && resend) {
-          console.log(`[Automation] Executing Action: ${emailStep.title}`);
-          try {
-            await resend.emails.send({
-              from: fromEmail,
-              to: email,
-              subject: emailStep.title || "Welcome to our community!",
-              html: `<p>Hi ${first_name || "there"},</p><p>${emailStep.description || "Thanks for joining us! We're excited to have you on board."}</p><br/><p>Best regards,</p>`,
-            });
-          } catch (err) {
-            console.error("[Automation] Resend Error:", err);
-          }
+    try {
+      if (tags && tags.length > 0) {
+        for (const tg of tags) {
+          await AutomationEngine.processLeadTriggers(lead.id, "tag_added", tg, finalUserId);
         }
+      } else {
+        await AutomationEngine.processLeadTriggers(lead.id, "lead_added", source || "unknown", finalUserId);
       }
+    } catch (e) {
+      console.error("[Engine] Trigger mapping failed:", e);
     }
 
     return NextResponse.json({ success: true, leadId: lead.id, redirect_url });
