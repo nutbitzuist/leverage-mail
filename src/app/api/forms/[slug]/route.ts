@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -6,9 +6,9 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   const { slug } = await params;
-  const supabase = createClient();
+  const adminSupabase = createAdminClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await adminSupabase
     .from("forms_landing_pages")
     .select("*, profiles(full_name)")
     .eq("slug", slug)
@@ -19,7 +19,7 @@ export async function GET(
   }
 
   // Increment view count (fire and forget)
-  supabase
+  adminSupabase
     .from("forms_landing_pages")
     .update({ view_count: data.view_count + 1 })
     .eq("id", data.id)

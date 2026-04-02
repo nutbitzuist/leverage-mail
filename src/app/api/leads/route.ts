@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 export async function GET() {
   const supabase = createClient();
@@ -37,6 +37,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = createClient();
+    const adminSupabase = createAdminClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     // If no user, this might be a public lead capture form
@@ -57,8 +58,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // 1. Insert or Update Lead
-    const { data: lead, error: leadError } = await supabase
+    // 1. Insert or Update Lead using Admin client to bypass RLS for public entry
+    const { data: lead, error: leadError } = await adminSupabase
       .from("leads")
       .upsert({
         email,
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
         source,
         metadata,
         user_id: finalUserId,
-      }, { onConflict: "email" })
+      }, { onConflict: "user_id,email" })
       .select()
       .single();
 
@@ -75,9 +76,10 @@ export async function POST(req: Request) {
 
     // 2. Add Tags if provided
     if (tags && tags.length > 0) {
-      const { data: existingTags } = await supabase
+      const { data: existingTags } = await adminSupabase
         .from("tags")
         .select("id, name")
+        .eq("user_id", finalUserId)
         .in("name", tags);
 
       if (existingTags && existingTags.length > 0) {
@@ -86,12 +88,12 @@ export async function POST(req: Request) {
           tag_id: tag.id
         }));
 
-        await supabase.from("lead_tags").upsert(leadTags);
+        await adminSupabase.from("lead_tags").upsert(leadTags);
       }
     }
 
     // 3. Trigger Automations (The "Brain")
-    const { data: activeAutomations } = await supabase
+    const { data: activeAutomations } = await adminSupabase
       .from("automations")
       .select("*")
       .eq("user_id", finalUserId)
@@ -99,13 +101,10 @@ export async function POST(req: Request) {
 
     if (activeAutomations && activeAutomations.length > 0) {
       console.log(`[Automation] Triggering ${activeAutomations.length} workflows for ${email}`);
-      // In a real system, we would enqueue these for a background worker.
-      // For this "One Person Business" OS, we'll simulate the first action if it's an email.
       activeAutomations.forEach(auto => {
         const firstStep = auto.workflow_steps?.find((s: { type: string, title?: string }) => s.type !== 'trigger');
         if (firstStep && firstStep.type === 'email') {
-          console.log(`[Automation] Action: ${firstStep.title} (Simulating Email Send via Resend)`);
-          // Here is where Resend API would be called
+          console.log(`[Automation] Action: ${firstStep.title} (Simulating Email Send via Resend/Admin API)`);
         }
       });
     }

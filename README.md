@@ -8,7 +8,8 @@ Welcome to your new Marketing OS. This platform is designed specifically for the
 To run the OS at full capacity, ensure you have these keys in your `.env.local`:
 - `OPENAI_API_KEY`: Powers the AI Page Builder and Email Polish.
 - `RESEND_API_KEY`: Powers actual email deliverability.
-- `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your database.
+- `SUPABASE_SERVICE_ROLE_KEY`: Required for public lead capture and landing page viewing (bypasses RLS for anonymous entries).
+- `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your database connections.
 
 ### 2. The AI Landing Page Builder
 - Go to `/dashboard/forms`.
