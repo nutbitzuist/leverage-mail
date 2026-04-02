@@ -38,10 +38,11 @@ export async function POST(req: Request) {
     const validated = LandingPageSchema.parse(content);
 
     return NextResponse.json(validated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AI Generation failed:", error);
+    const message = error instanceof Error ? error.message : "Failed to generate page content.";
     return NextResponse.json(
-      { error: error?.message || "Failed to generate page content." },
+      { error: message },
       { status: 500 }
     );
   }

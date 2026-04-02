@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { 
   Plus, 
   Search, 
-  Mail, 
   Send,
   Clock,
   MoreHorizontal,

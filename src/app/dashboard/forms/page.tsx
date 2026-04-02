@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { Sparkles, Loader2, Globe, Save, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

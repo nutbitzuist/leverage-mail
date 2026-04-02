@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { Resend } from "resend";
 
 export async function GET() {
   const supabase = createClient();
@@ -76,18 +77,22 @@ export async function POST(req: Request) {
 
     // 2. Add Tags if provided
     if (tags && tags.length > 0) {
-      const { data: existingTags } = await adminSupabase
+      // Upsert tags (create if not exist)
+      const tagPayloads = tags.map((tagName: string) => ({
+        user_id: finalUserId,
+        name: tagName,
+      }));
+      
+      const { data: upsertedTags, error: tagError } = await adminSupabase
         .from("tags")
-        .select("id, name")
-        .eq("user_id", finalUserId)
-        .in("name", tags);
+        .upsert(tagPayloads, { onConflict: "user_id,name" })
+        .select("id, name");
 
-      if (existingTags && existingTags.length > 0) {
-        const leadTags = existingTags.map(tag => ({
+      if (!tagError && upsertedTags) {
+        const leadTags = upsertedTags.map(tag => ({
           lead_id: lead.id,
           tag_id: tag.id
         }));
-
         await adminSupabase.from("lead_tags").upsert(leadTags);
       }
     }
@@ -101,12 +106,29 @@ export async function POST(req: Request) {
 
     if (activeAutomations && activeAutomations.length > 0) {
       console.log(`[Automation] Triggering ${activeAutomations.length} workflows for ${email}`);
-      activeAutomations.forEach(auto => {
-        const firstStep = auto.workflow_steps?.find((s: { type: string, title?: string }) => s.type !== 'trigger');
-        if (firstStep && firstStep.type === 'email') {
-          console.log(`[Automation] Action: ${firstStep.title} (Simulating Email Send via Resend/Admin API)`);
+      
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const resend = resendApiKey ? new Resend(resendApiKey) : null;
+      const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
+
+      for (const auto of activeAutomations) {
+        // Find immediate next step after trigger
+        const emailStep = auto.workflow_steps?.find((s: { type: string, title?: string, description?: string }) => s.type === 'email');
+        
+        if (emailStep && resend) {
+          console.log(`[Automation] Executing Action: ${emailStep.title}`);
+          try {
+            await resend.emails.send({
+              from: fromEmail,
+              to: email,
+              subject: emailStep.title || "Welcome to our community!",
+              html: `<p>Hi ${first_name || "there"},</p><p>${emailStep.description || "Thanks for joining us! We're excited to have you on board."}</p><br/><p>Best regards,</p>`,
+            });
+          } catch (err) {
+            console.error("[Automation] Resend Error:", err);
+          }
         }
-      });
+      }
     }
 
     return NextResponse.json({ success: true, leadId: lead.id, redirect_url });

@@ -157,21 +157,31 @@ export default function NewBroadcastPage() {
                  <div className="flex items-center justify-between ml-1">
                    <label className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">Email Content</label>
                    <div className="flex items-center gap-1 border border-[hsl(var(--border))] rounded-lg p-1 bg-[hsl(var(--secondary)/0.5)]">
-                     <Button variant="ghost" size="icon" className="h-7 w-7"><Bold className="w-3.5 h-3.5" /></Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7"><Italic className="w-3.5 h-3.5" /></Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7"><LinkIcon className="w-3.5 h-3.5" /></Button>
-                     <Button variant="ghost" size="icon" className="h-7 w-7"><List className="w-3.5 h-3.5" /></Button>
+                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => document.execCommand('bold', false)}><Bold className="w-3.5 h-3.5" /></Button>
+                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => document.execCommand('italic', false)}><Italic className="w-3.5 h-3.5" /></Button>
+                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                       const url = prompt('Enter link URL:');
+                       if (url) document.execCommand('createLink', false, url);
+                     }}><LinkIcon className="w-3.5 h-3.5" /></Button>
+                     <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => document.execCommand('insertUnorderedList', false)}><List className="w-3.5 h-3.5" /></Button>
                    </div>
                  </div>
                  
                  <div className="relative">
-                   <textarea 
-                     value={content}
-                     onChange={(e) => setContent(e.target.value)}
+                   <div
                      className="w-full min-h-[400px] p-6 bg-[hsl(var(--background))] border border-[hsl(var(--border))] rounded-2xl outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] transition-all font-serif text-lg leading-relaxed resize-none"
-                     placeholder="Hello friend, today I want to share..."
+                     contentEditable
+                     onInput={(e) => setContent(e.currentTarget.innerHTML)}
+                     dangerouslySetInnerHTML={{ __html: content || '' }}
+                     onBlur={(e) => {
+                       // prevent React cursor jumping
+                       if (e.currentTarget.innerHTML !== content) {
+                         setContent(e.currentTarget.innerHTML);
+                       }
+                     }}
                    />
                    <Button 
+                    type="button"
                     variant="outline" 
                     size="sm" 
                     className="absolute bottom-4 right-4 gap-2 bg-white/50 backdrop-blur-sm border-[hsl(var(--primary)/0.2)]"

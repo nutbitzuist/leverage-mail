@@ -28,7 +28,7 @@ export const AIService = {
   /**
    * Generates a summary or insight for a lead's metadata using Claude 3.5 Sonnet.
    */
-  async generateLeadInsight(leadData: { email: string, metadata?: Record<string, any> }) {
+  async generateLeadInsight(leadData: { email: string, metadata?: Record<string, unknown> }) {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error("Anthropic API Key missing");
 
     const prompt = `Analyze this lead data and provide a 1-sentence insight for a business owner. Data: ${JSON.stringify(leadData)}`;

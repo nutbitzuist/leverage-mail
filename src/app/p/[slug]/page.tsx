@@ -147,7 +147,7 @@ export default function PublicLandingPage() {
 
         {/* Benefits Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-12 border-t border-slate-100">
-          {content.benefits?.map((benefit: any, i: number) => (
+          {content.benefits?.map((benefit: { title: string; description: string }, i: number) => (
             <div key={i} className="space-y-4">
               <div 
                 className="w-12 h-12 rounded-2xl flex items-center justify-center"
