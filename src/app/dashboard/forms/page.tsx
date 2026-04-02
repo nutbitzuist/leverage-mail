@@ -1,7 +1,5 @@
-"use client";
-
 import React, { useState } from "react";
-import { Sparkles, Loader2, PanelRight, Globe, Save } from "lucide-react";
+import { Sparkles, Loader2, Globe, Save, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/dashboard-layout";
 import { LandingPageContent } from "@/lib/ai/prompts";
@@ -9,11 +7,14 @@ import { LandingPageContent } from "@/lib/ai/prompts";
 export default function FormsPage() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<LandingPageContent | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt) return;
     setIsGenerating(true);
+    setPublishedUrl(null);
     try {
       const res = await fetch("/api/ai/generate-page", {
         method: "POST",
@@ -31,6 +32,34 @@ export default function FormsPage() {
     }
   };
 
+  const handlePublish = async () => {
+    if (!generatedContent) return;
+    setIsPublishing(true);
+    try {
+      // Generate a random slug for the demo
+      const slug = Math.random().toString(36).substring(2, 10);
+      const res = await fetch("/api/forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: generatedContent.hero.headline,
+          content_json: generatedContent,
+          slug,
+        }),
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      
+      const fullUrl = `${window.location.origin}/p/${slug}`;
+      setPublishedUrl(fullUrl);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to publish page.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
@@ -42,14 +71,14 @@ export default function FormsPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
-              <PanelRight className="w-4 h-4" />
-              Templates
-            </Button>
-            <Button className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              New Page
-            </Button>
+             {publishedUrl && (
+               <a href={publishedUrl} target="_blank" rel="noopener noreferrer">
+                 <Button variant="outline" className="gap-2 text-green-600 border-green-200">
+                    <ExternalLink className="w-4 h-4" />
+                    View Live Page
+                 </Button>
+               </a>
+             )}
           </div>
         </div>
 
@@ -76,23 +105,42 @@ export default function FormsPage() {
                 ) : (
                   <Sparkles className="w-5 h-5" />
                 )}
-                Generate Magic
+                {generatedContent ? "Regenerate Content" : "Generate Magic"}
               </Button>
             </div>
 
-            {generatedContent && (
+            {generatedContent && !publishedUrl && (
               <div className="p-6 border border-[hsl(var(--border))] rounded-2xl glass space-y-4 animate-in">
-                <h3 className="font-semibold">Quick Actions</h3>
+                <h3 className="font-semibold">Ready to Launch?</h3>
                 <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <Globe className="w-4 h-4" />
-                    Configure Domain
+                  <Button 
+                    className="w-full justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                  >
+                    {isPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                    Publish to Public URL
                   </Button>
-                  <Button variant="outline" className="w-full justify-start gap-2">
+                  <Button variant="outline" className="w-full justify-center gap-2">
                     <Save className="w-4 h-4" />
                     Save Draft
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {publishedUrl && (
+              <div className="p-6 border border-green-200 bg-green-50/50 rounded-2xl space-y-4 animate-in zoom-in-95">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <h3 className="font-bold">Page is Live!</h3>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-green-100 font-mono text-[10px] break-all">
+                  {publishedUrl}
+                </div>
+                <p className="text-xs text-green-700/70">
+                  Share this URL with your audience to start capturing leads instantly.
+                </p>
               </div>
             )}
           </div>
@@ -154,7 +202,7 @@ export default function FormsPage() {
 
                     {/* Benefits */}
                     <div className="bg-slate-50 py-12 px-12 grid grid-cols-3 gap-6">
-                      {generatedContent.benefits.map((benefit, i) => (
+                      {generatedContent.benefits.map((benefit: { title: string, description: string }, i: number) => (
                         <div key={i} className="text-center space-y-2">
                            <div className="w-10 h-10 rounded-full mx-auto flex items-center justify-center bg-white shadow-sm mb-2">
                              <Sparkles className="w-5 h-5" style={{ color: generatedContent.theme.primaryColor }} />

@@ -1,28 +1,64 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Fetch leads with tags
+  const { data, error } = await supabase
+    .from("leads")
+    .select(`
+      *,
+      lead_tags(
+        tags(name, color)
+      )
+    `)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Flatten the response for the frontend
+  const leads = data.map((lead: { id: string; email: string; first_name: string; last_name: string; created_at: string; status: string; lead_tags: { tags: { name: string; color: string } }[] }) => ({
+    ...lead,
+    tags: lead.lead_tags?.map((lt: { tags: { name: string; color: string } }) => lt.tags) || []
+  }));
+
+  return NextResponse.json(leads);
+}
 
 export async function POST(req: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
-        { error: "Supabase configuration is missing. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
-        { status: 500 }
-      );
-    }
+    // If no user, this might be a public lead capture form
+    // We should allow this but we'll need a way to link it to a specific user/account
+    // For now, we'll try to get the user_id from the body if the caller is an admin
+    // or just use the auth user.
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
     const body = await req.json();
-    const { email, first_name, last_name, source, metadata, tags } = body;
+    const { email, first_name, last_name, source, metadata, tags, redirect_url, target_user_id } = body;
+
+    const finalUserId = user?.id || target_user_id;
+
+    if (!finalUserId) {
+      return NextResponse.json({ error: "User context missing" }, { status: 400 });
+    }
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     // 1. Insert or Update Lead
-    const { data: lead, error: leadError } = await supabaseAdmin
+    const { data: lead, error: leadError } = await supabase
       .from("leads")
       .upsert({
         email,
@@ -30,7 +66,7 @@ export async function POST(req: Request) {
         last_name,
         source,
         metadata,
-        user_id: "7ee6f1c7-7e61-4e6f-9e6f-7e6f7e6f7e6f", // Placeholder UUID for testing/initial dev
+        user_id: finalUserId,
       }, { onConflict: "email" })
       .select()
       .single();
@@ -39,7 +75,7 @@ export async function POST(req: Request) {
 
     // 2. Add Tags if provided
     if (tags && tags.length > 0) {
-      const { data: existingTags } = await supabaseAdmin
+      const { data: existingTags } = await supabase
         .from("tags")
         .select("id, name")
         .in("name", tags);
@@ -50,14 +86,35 @@ export async function POST(req: Request) {
           tag_id: tag.id
         }));
 
-        await supabaseAdmin.from("lead_tags").upsert(leadTags);
+        await supabase.from("lead_tags").upsert(leadTags);
       }
     }
 
-    return NextResponse.json({ success: true, leadId: lead.id });
+    // 3. Trigger Automations (The "Brain")
+    const { data: activeAutomations } = await supabase
+      .from("automations")
+      .select("*")
+      .eq("user_id", finalUserId)
+      .eq("is_active", true);
 
-  } catch (error: any) {
+    if (activeAutomations && activeAutomations.length > 0) {
+      console.log(`[Automation] Triggering ${activeAutomations.length} workflows for ${email}`);
+      // In a real system, we would enqueue these for a background worker.
+      // For this "One Person Business" OS, we'll simulate the first action if it's an email.
+      activeAutomations.forEach(auto => {
+        const firstStep = auto.workflow_steps?.find((s: { type: string, title?: string }) => s.type !== 'trigger');
+        if (firstStep && firstStep.type === 'email') {
+          console.log(`[Automation] Action: ${firstStep.title} (Simulating Email Send via Resend)`);
+          // Here is where Resend API would be called
+        }
+      });
+    }
+
+    return NextResponse.json({ success: true, leadId: lead.id, redirect_url });
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Lead capture failed";
     console.error("Lead capture failed:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

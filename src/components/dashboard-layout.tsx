@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { 
   BarChart3, 
   Users, 
@@ -16,15 +19,17 @@ interface SidebarItemProps {
   href: string;
   icon: React.ReactNode;
   label: string;
-  active?: boolean;
 }
 
-function SidebarItem({ href, icon, label, active }: SidebarItemProps) {
+function SidebarItem({ href, icon, label }: SidebarItemProps) {
+  const pathname = usePathname();
+  const isActive = pathname === href || (href !== "/dashboard" && pathname?.startsWith(href));
+
   return (
     <Link
       href={href}
       className={`group flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-        active 
+        isActive 
           ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]" 
           : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--accent-foreground))]"
       }`}
@@ -49,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <nav className="space-y-1">
-            <SidebarItem href="/dashboard" icon={<BarChart3 />} label="Dashboard" active />
+            <SidebarItem href="/dashboard" icon={<BarChart3 />} label="Dashboard" />
             <SidebarItem href="/dashboard/leads" icon={<Users />} label="Audience" />
             <SidebarItem href="/dashboard/forms" icon={<Layout />} label="Landing Pages" />
             <SidebarItem href="/dashboard/broadcasts" icon={<Mail />} label="Broadcasts" />
