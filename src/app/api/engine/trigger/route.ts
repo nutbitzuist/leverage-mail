@@ -13,6 +13,7 @@ export async function POST(req: Request) {
   const resendApiKey = process.env.RESEND_API_KEY;
   const resend = resendApiKey ? new Resend(resendApiKey) : null;
   const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://leverage-mail.vercel.app";
 
   // Get lead details
   const { data: lead } = await adminSupabase.from("leads").select("*").eq("id", leadId).single();
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
                           from: fromEmail,
                           to: lead.email,
                           subject: emailStep.title,
-                          html: `<p>Hi ${lead.first_name || "there"},</p><p>${emailStep.description}</p>`,
+                          html: `<p>Hi ${lead.first_name || "there"},</p><p>${emailStep.description}</p><p style="font-size:11px;color:#999;margin-top:32px;text-align:center;"><a href="${appUrl}/unsubscribe?uid=${userId}&email=${encodeURIComponent(lead.email)}" style="color:#999;">Unsubscribe</a></p>`,
                       });
                       console.log(`[Engine] Visual Auto Fired: Sent direct email.`);
                   } catch (e) {

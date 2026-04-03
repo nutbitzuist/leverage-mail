@@ -15,7 +15,10 @@ import {
   Save,
   Network,
   ListOrdered,
-  Workflow
+  Workflow,
+  X,
+  AlertCircle,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardLayout from "@/components/dashboard-layout";
@@ -82,23 +85,87 @@ export default function AutomationsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Sequences State
-  const [sequences, setSequences] = useState<{ id: string, name: string }[]>([]);
+  interface SequenceEmail { id?: string; subject: string; content_html: string; delay_days: number; delay_hours: number; order_index: number; }
+  interface Sequence { id: string; name: string; sequence_emails?: SequenceEmail[]; }
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [showSeqModal, setShowSeqModal] = useState(false);
+  const [editSeq, setEditSeq] = useState<{ name: string; emails: SequenceEmail[] }>({ name: "", emails: [{ subject: "", content_html: "", delay_days: 0, delay_hours: 0, order_index: 0 }] });
+  const [editSeqId, setEditSeqId] = useState<string | null>(null);
+  const [isSavingSeq, setIsSavingSeq] = useState(false);
   
   // Rules State
-  const [rules, setRules] = useState<any[]>([]);
+  interface Rule { id: string; name: string; trigger_type: string; trigger_value: string; action_type: string; action_value: string; is_active: boolean; }
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [showRuleModal, setShowRuleModal] = useState(false);
+  const [editRule, setEditRule] = useState<{ name: string; trigger_type: string; trigger_value: string; action_type: string; action_value: string }>({ name: "", trigger_type: "tag_added", trigger_value: "", action_type: "subscribe_to_sequence", action_value: "" });
+  const [isSavingRule, setIsSavingRule] = useState(false);
 
   useEffect(() => {
     fetchAutomations();
-    // Simulate fetching sequences and rules
-    setSequences([
-      { id: "seq_1", name: "Onboarding Nurture (7 Days)" },
-      { id: "seq_2", name: "Abandoned Cart Push" }
-    ]);
-    setRules([
-      { id: "1", trigger: "Purchased eBook", action: "Add Tag: Customer" },
-      { id: "2", trigger: "Tag Added: VIP", action: "Subscribe to Onboarding Nurture" }
-    ]);
+    fetchSequences();
+    fetchRules();
   }, []);
+
+  const fetchSequences = async () => {
+    try {
+      const res = await fetch("/api/sequences");
+      const data = await res.json();
+      if (Array.isArray(data)) setSequences(data);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchRules = async () => {
+    try {
+      const res = await fetch("/api/rules");
+      const data = await res.json();
+      if (Array.isArray(data)) setRules(data);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSaveSequence = async () => {
+    if (!editSeq.name) return;
+    setIsSavingSeq(true);
+    try {
+      await fetch("/api/sequences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editSeqId, name: editSeq.name, emails: editSeq.emails }),
+      });
+      setShowSeqModal(false);
+      setEditSeqId(null);
+      setEditSeq({ name: "", emails: [{ subject: "", content_html: "", delay_days: 0, delay_hours: 0, order_index: 0 }] });
+      fetchSequences();
+    } catch (err) { console.error(err); }
+    finally { setIsSavingSeq(false); }
+  };
+
+  const handleDeleteSequence = async (id: string) => {
+    if (!confirm("Delete this sequence?")) return;
+    await fetch("/api/sequences", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    fetchSequences();
+  };
+
+  const handleSaveRule = async () => {
+    if (!editRule.name || !editRule.trigger_value || !editRule.action_value) return;
+    setIsSavingRule(true);
+    try {
+      await fetch("/api/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editRule),
+      });
+      setShowRuleModal(false);
+      setEditRule({ name: "", trigger_type: "tag_added", trigger_value: "", action_type: "subscribe_to_sequence", action_value: "" });
+      fetchRules();
+    } catch (err) { console.error(err); }
+    finally { setIsSavingRule(false); }
+  };
+
+  const handleDeleteRule = async (id: string) => {
+    if (!confirm("Delete this rule?")) return;
+    await fetch("/api/rules", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    fetchRules();
+  };
 
   const fetchAutomations = async () => {
     try {
@@ -266,25 +333,40 @@ export default function AutomationsPage() {
            <div className="flex-1 animate-in slide-in-from-bottom-4 duration-500">
              <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold">Drip Email Sequences</h3>
-                <Button className="gap-2"><Plus className="w-4 h-4" /> Create Sequence</Button>
+                <Button className="gap-2" onClick={() => { setEditSeqId(null); setEditSeq({ name: "", emails: [{ subject: "", content_html: "", delay_days: 0, delay_hours: 0, order_index: 0 }] }); setShowSeqModal(true); }}><Plus className="w-4 h-4" /> Create Sequence</Button>
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {sequences.map(seq => (
-                  <div key={seq.id} className="p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-between hover:shadow-md transition-all cursor-pointer group">
-                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                          <ListOrdered className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900">{seq.name}</h4>
-                          <p className="text-xs text-slate-500 mt-1">Multi-day automated drip</p>
-                        </div>
-                     </div>
-                     <Button variant="ghost" size="sm">Edit</Button>
-                  </div>
-                ))}
-             </div>
+             {sequences.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 rounded-3xl opacity-50">
+                 <ListOrdered className="w-12 h-12 mb-4" />
+                 <p className="font-bold text-lg">No sequences yet</p>
+                 <p className="text-sm">Create your first drip email sequence to nurture leads automatically.</p>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sequences.map(seq => (
+                    <div key={seq.id} className="p-6 bg-white border border-slate-200 rounded-2xl flex items-center justify-between hover:shadow-md transition-all cursor-pointer group">
+                       <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                            <ListOrdered className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900">{seq.name}</h4>
+                            <p className="text-xs text-slate-500 mt-1">{seq.sequence_emails?.length || 0} emails in sequence</p>
+                          </div>
+                       </div>
+                       <div className="flex gap-2">
+                         <Button variant="ghost" size="sm" onClick={() => {
+                           setEditSeqId(seq.id);
+                           setEditSeq({ name: seq.name, emails: seq.sequence_emails && seq.sequence_emails.length > 0 ? seq.sequence_emails : [{ subject: "", content_html: "", delay_days: 0, delay_hours: 0, order_index: 0 }] });
+                           setShowSeqModal(true);
+                         }}>Edit</Button>
+                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteSequence(seq.id)}><Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500" /></Button>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+             )}
            </div>
         )}
 
@@ -293,30 +375,144 @@ export default function AutomationsPage() {
            <div className="flex-1 animate-in slide-in-from-bottom-4 duration-500">
              <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold">If / Then Rules</h3>
-                <Button className="gap-2"><Plus className="w-4 h-4" /> Add Rule</Button>
+                <Button className="gap-2" onClick={() => { setEditRule({ name: "", trigger_type: "tag_added", trigger_value: "", action_type: "subscribe_to_sequence", action_value: "" }); setShowRuleModal(true); }}><Plus className="w-4 h-4" /> Add Rule</Button>
              </div>
              
-             <div className="space-y-3 max-w-4xl">
-                {rules.map(rule => (
-                  <div key={rule.id} className="p-4 bg-white border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                     <div className="flex items-center gap-3 flex-1">
-                        <div className="px-3 py-1 bg-slate-100 rounded-md text-xs font-bold text-slate-600">IF</div>
-                        <div className="font-medium text-sm text-slate-800">{rule.trigger}</div>
-                     </div>
-                     <div className="hidden md:block">
-                        <ArrowDown className="w-4 h-4 text-slate-300 -rotate-90" />
-                     </div>
-                     <div className="flex items-center gap-3 flex-1">
-                        <div className="px-3 py-1 bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] rounded-md text-xs font-bold">THEN</div>
-                        <div className="font-medium text-sm text-slate-800">{rule.action}</div>
-                     </div>
-                     <div>
-                       <Button variant="ghost" size="icon"><Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500" /></Button>
-                     </div>
-                  </div>
-                ))}
-             </div>
+             {rules.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 rounded-3xl opacity-50">
+                 <Workflow className="w-12 h-12 mb-4" />
+                 <p className="font-bold text-lg">No rules yet</p>
+                 <p className="text-sm">Create IF/THEN rules to automate actions when triggers fire.</p>
+               </div>
+             ) : (
+               <div className="space-y-3 max-w-4xl">
+                  {rules.map(rule => (
+                    <div key={rule.id} className="p-4 bg-white border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                       <div className="flex items-center gap-3 flex-1">
+                          <div className="px-3 py-1 bg-slate-100 rounded-md text-xs font-bold text-slate-600">IF</div>
+                          <div className="font-medium text-sm text-slate-800">{rule.trigger_type}: {rule.trigger_value}</div>
+                       </div>
+                       <div className="hidden md:block">
+                          <ArrowDown className="w-4 h-4 text-slate-300 -rotate-90" />
+                       </div>
+                       <div className="flex items-center gap-3 flex-1">
+                          <div className="px-3 py-1 bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] rounded-md text-xs font-bold">THEN</div>
+                          <div className="font-medium text-sm text-slate-800">{rule.action_type}: {rule.action_value}</div>
+                       </div>
+                       <div>
+                         <Button variant="ghost" size="icon" onClick={() => handleDeleteRule(rule.id)}><Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500" /></Button>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+             )}
            </div>
+        )}
+
+        {/* Sequence Modal */}
+        {showSeqModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => !isSavingSeq && setShowSeqModal(false)}>
+            <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-lg font-bold">{editSeqId ? "Edit Sequence" : "Create Sequence"}</h2>
+                <button onClick={() => setShowSeqModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Sequence Name</label>
+                  <input type="text" placeholder="e.g. Onboarding Nurture" value={editSeq.name} onChange={e => setEditSeq({...editSeq, name: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]" />
+                </div>
+                <div className="space-y-4">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 block">Emails in Sequence</label>
+                  {editSeq.emails.map((email, idx) => (
+                    <div key={idx} className="p-4 border border-slate-200 rounded-xl space-y-3 bg-slate-50/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-500">Email #{idx + 1}</span>
+                        {editSeq.emails.length > 1 && (
+                          <button onClick={() => setEditSeq({...editSeq, emails: editSeq.emails.filter((_, i) => i !== idx)})} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                        )}
+                      </div>
+                      <input type="text" placeholder="Subject line" value={email.subject} onChange={e => { const emails = [...editSeq.emails]; emails[idx] = {...emails[idx], subject: e.target.value}; setEditSeq({...editSeq, emails}); }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]" />
+                      <textarea placeholder="Email HTML content..." value={email.content_html} onChange={e => { const emails = [...editSeq.emails]; emails[idx] = {...emails[idx], content_html: e.target.value}; setEditSeq({...editSeq, emails}); }} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] min-h-[80px]" />
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Delay Days</label>
+                          <input type="number" min={0} value={email.delay_days} onChange={e => { const emails = [...editSeq.emails]; emails[idx] = {...emails[idx], delay_days: parseInt(e.target.value) || 0}; setEditSeq({...editSeq, emails}); }} className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Delay Hours</label>
+                          <input type="number" min={0} value={email.delay_hours} onChange={e => { const emails = [...editSeq.emails]; emails[idx] = {...emails[idx], delay_hours: parseInt(e.target.value) || 0}; setEditSeq({...editSeq, emails}); }} className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditSeq({...editSeq, emails: [...editSeq.emails, { subject: "", content_html: "", delay_days: 1, delay_hours: 0, order_index: editSeq.emails.length }]})}>
+                    <Plus className="w-3.5 h-3.5" /> Add Email Step
+                  </Button>
+                </div>
+              </div>
+              <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowSeqModal(false)} disabled={isSavingSeq}>Cancel</Button>
+                <Button onClick={handleSaveSequence} disabled={isSavingSeq || !editSeq.name} className="gap-2">
+                  {isSavingSeq ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Sequence
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rule Modal */}
+        {showRuleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => !isSavingRule && setShowRuleModal(false)}>
+            <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">Create Rule</h2>
+                <button onClick={() => setShowRuleModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Rule Name</label>
+                  <input type="text" placeholder="e.g. Welcome new VIPs" value={editRule.name} onChange={e => setEditRule({...editRule, name: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Trigger Type</label>
+                    <select value={editRule.trigger_type} onChange={e => setEditRule({...editRule, trigger_type: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-white">
+                      <option value="tag_added">Tag Added</option>
+                      <option value="form_joined">Form Joined</option>
+                      <option value="lead_added">Lead Added</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Trigger Value</label>
+                    <input type="text" placeholder="e.g. tag name or form slug" value={editRule.trigger_value} onChange={e => setEditRule({...editRule, trigger_value: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Action Type</label>
+                    <select value={editRule.action_type} onChange={e => setEditRule({...editRule, action_type: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-white">
+                      <option value="subscribe_to_sequence">Subscribe to Sequence</option>
+                      <option value="add_tag">Add Tag</option>
+                      <option value="send_email">Send Email</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Action Value</label>
+                    <input type="text" placeholder="e.g. sequence ID or tag name" value={editRule.action_value} onChange={e => setEditRule({...editRule, action_value: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => setShowRuleModal(false)} disabled={isSavingRule}>Cancel</Button>
+                <Button onClick={handleSaveRule} disabled={isSavingRule || !editRule.name || !editRule.trigger_value || !editRule.action_value} className="gap-2">
+                  {isSavingRule ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Save Rule
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

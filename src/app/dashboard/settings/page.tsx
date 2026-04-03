@@ -1,6 +1,7 @@
 import React from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { createClient } from "@/lib/supabase/server";
+
 import { 
   Globe, 
   Code2, 
@@ -11,6 +12,8 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const supabase = createClient();

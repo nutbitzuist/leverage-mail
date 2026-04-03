@@ -40,19 +40,21 @@ export async function POST(req: Request) {
   if (status === "sent") {
     const { data: leads } = await supabase
       .from("leads")
-      .select("email")
+      .select("email, first_name")
       .eq("user_id", user.id)
       .eq("status", "active");
 
     if (leads && leads.length > 0 && process.env.RESEND_API_KEY) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://leverage-mail.vercel.app";
       
       const emailPayloads = leads.map(l => ({
         from: fromEmail,
         to: [l.email],
         subject: subject,
-        html: content_html,
+        html: content_html.replace(/\{\{first_name\}\}/g, l.first_name || "there")
+          + `<p style="font-size:11px;color:#999;margin-top:32px;text-align:center;"><a href="${appUrl}/unsubscribe?uid=${user.id}&email=${encodeURIComponent(l.email)}" style="color:#999;">Unsubscribe</a></p>`,
       }));
 
       try {
